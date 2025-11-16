@@ -1,0 +1,64 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'com.hackwarts.recordadora'
+version = '1.0.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) } // Burp y Montoya van bien con 17
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    proguard
+}
+
+dependencies {
+    // Usa una Montoya reciente (ajustamos tu 2023.9 -> 2024.7)
+    implementation 'net.portswigger.burp.extensions:montoya-api:2024.7'
+
+    // ProGuard CLI (opcional)
+    proguard 'com.guardsquare:proguard-base:7.5.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.shadowJar.configure {
+    archiveBaseName.set("Recordadora")
+    archiveVersion.set("")       // sin versión en el nombre
+    archiveClassifier.set("")    // sin sufijo "-all"
+    mergeServiceFiles()          // necesario para Montoya (service providers)
+
+    // OJO: minimizar puede romper providers; si lo quieres, excluye Montoya:
+    minimize {
+        exclude(dependency('net.portswigger.burp.extensions:montoya-api:.*'))
+    }
+}
+
+tasks.jar.configure {
+    manifest {
+        attributes(
+            'Implementation-Title': 'Recordadora',
+            'Implementation-Version': version,
+            'Built-By': 'Hackwarts12'
+        )
+    }
+}
+
+// === ProGuard opcional: ofuscar el shadowJar ===
+tasks.register('obfuscate', JavaExec) {
+    group = 'build'
+    description = 'Obfuscate shadow jar with ProGuard'
+    dependsOn tasks.shadowJar
+    classpath = configurations.proguard
+    mainClass.set('proguard.ProGuard')
+    // Usa proguard.pro en la raíz
+    args '@proguard.pro'
+}
